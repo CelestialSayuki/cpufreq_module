@@ -19,6 +19,7 @@ const struct cpufreq_hw_config s5l8960x_config = {
 const struct cpufreq_hw_config t7000_config = {
     .max_pstate = 7,
     .default_state = 2,
+    .get_vcore = get_vcore_s5l8960x,
     .cluster_base = 0x202200000,
     .voltage_ctl = 0x20e023000,
     .get_frequency_for_state = get_frequency_for_state_s5l8960x,

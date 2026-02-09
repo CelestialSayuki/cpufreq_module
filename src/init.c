@@ -43,12 +43,6 @@ __attribute__((visibility("default"))) void module_entry(void)
     };
 
     board_id = *((uint32_t *)dt_prop(dt_find(gDeviceTree, "/chosen"), "board-id", NULL));
-
-    write32(data.hw_config->voltage_ctl, 1);
-
-    if (data.hw_config->hw_init)
-        data.hw_config->hw_init(data.hw_config->cluster_base);
-
     uint64_t iboot_freq = get_frequency_for_state(data.hw_config->default_state);
     uint32_t max_config_state;
     for (max_config_state = data.hw_config->default_state + 1;
@@ -81,17 +75,27 @@ __attribute__((visibility("default"))) void module_entry(void)
                 data.max_nonboost_pstate = max_config_state - 1;
         }
     }
-
     if (!data.max_nonboost_pstate)
         data.max_nonboost_pstate = max_config_state - 1;
-
     data.max_configured_pstate = max_config_state - 1;
-
-    set64(data.hw_config->cluster_base + 0x200f8, BIT(40));
-
-    printf("cpufreq: CPU state: %llu -> %u\n", get_state(), data.max_nonboost_pstate);
-    set_state(data.max_nonboost_pstate);
-
+    uint64_t current_hz = bench();
+    int closest_state = -1;
+    uint64_t min_diff = ~0ULL;
+    for (int i = 0; i <= data.max_configured_pstate; i++) {
+        uint64_t state_hz = get_frequency_for_state(i);
+        if (state_hz == 0) continue;
+        uint64_t diff = (current_hz > state_hz) ? (current_hz - state_hz) : (state_hz - current_hz);
+        if (diff < min_diff) {
+            min_diff = diff;
+            closest_state = i;
+        }
+    }
+    printf("cpufreq: Initialized\n");
+    printf("cpufreq: Measured Boot Freq: %llu Hz\n", current_hz);
+    if (closest_state != -1) {
+        printf("cpufreq: Matches State: %d (%llu Hz)\n", closest_state, get_frequency_for_state(closest_state));
+    }
+    printf("cpufreq: Use 'cpufreq control on' to enable hardware control.\n");
     command_register("cpufreq", "CPU frequency scaling", cpufreq_cmd);
     return;
 }
