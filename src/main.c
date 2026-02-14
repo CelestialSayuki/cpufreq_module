@@ -258,8 +258,15 @@ void cpufreq_edit(const char *cmd, char *args)
     uint64_t base_addr = data.hw_config->cluster_base;
     switch (socnum) {
         case 0x7000: case 0x7001: case 0x8960:
-            val_mul = input_freq / 24;
-            real_freq_mhz = val_mul * 24;
+            uint64_t div2_val = 0;
+            if (input_freq % 24 != 0) {
+                div2_val = 1;
+                val_mul = input_freq / 12;
+            } else {
+                div2_val = 0;
+                val_mul = input_freq / 24;
+            }
+            real_freq_mhz = (uint32_t)((val_mul * 24) / (div2_val + 1));
             if (volt_mv < 600) volt_mv = 600;
             val_vcore = ((uint64_t)(volt_mv - 600) * 1000) / 3125;
             real_volt_uv = 600000 + (val_vcore * 3125);
@@ -276,11 +283,11 @@ void cpufreq_edit(const char *cmd, char *args)
                       FIELD_PREP(CLUSTER_PSINFO1_VCORE_S8000, val_vcore & 0xFF) |
                       FIELD_PREP(MUL_S5L8960X, val_mul & 0x1FF) |
                       FIELD_PREP(DIV1_S5L8960X, 1) |
-                      FIELD_PREP(DIV2_S5L8960X, 0);
+                      FIELD_PREP(DIV2_S5L8960X, div2_val);
             printf("cpufreq: Edit -> Freq: %u MHz (Reg: %u MHz) | Volt: %u mV (Real: %u.%03u mV) | Magic: 0x%llx\n",
-                   input_freq, real_freq_mhz,
-                   volt_mv, (uint32_t)(real_volt_uv / 1000), (uint32_t)(real_volt_uv % 1000),
-                   magic_bits);
+                    input_freq, real_freq_mhz,
+                    volt_mv, (uint32_t)(real_volt_uv / 1000), (uint32_t)(real_volt_uv % 1000),
+                    magic_bits);
             break;
         case 0x8000: case 0x8001: case 0x8003:
             val_mul = input_freq / 12;
